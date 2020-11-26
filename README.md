@@ -27,7 +27,7 @@ python train.py
 
 # Train COCO dataset
 
-Download COCO dataset and annotation files
+Download COCO dataset and annotation files [here](https://cocodataset.org/#download)
 
 Change data folder and annotation folder in `configs/blendmask.yaml`
 

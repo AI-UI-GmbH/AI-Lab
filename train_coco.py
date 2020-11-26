@@ -3,6 +3,8 @@ import scipy
 
 from pycocotools.coco import COCO
 
+from config import config
+from models import blendmask
 from dataset import Dataset
 
 
@@ -44,3 +46,13 @@ class CocoDataset(Dataset):
         masks = scipy.ndimage.zoom(masks, zoom=[1, scale_h, scale_w], order=0)
         class_ids = np.array(class_ids, dtype=np.int32)
         return masks.astype(np.bool), class_ids
+
+
+if __name__ == "__main__":
+    config_filename = 'configs/blendmask.yaml'
+    cfg = config(filename=config_filename)
+
+    assert cfg.DATA.IMAGE_SIZE % 2 ** 6 == 0, "Image size must be dividable by 2 at least 6 times " \
+                                              "to avoid fractions when downscaling and upscaling. " \
+                                              "For example, use 256, 320, 384, 448, 512, ... etc."
+    blendmask.train(cfg, CocoDataset)

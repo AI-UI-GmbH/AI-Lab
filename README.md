@@ -24,3 +24,14 @@ Run:
 ```
 python train.py
 ```
+
+# Train COCO dataset
+
+Download COCO dataset and annotation files
+
+Change data folder and annotation folder in `configs/blendmask.yaml`
+
+Run:
+```
+python train_coco.py
+```

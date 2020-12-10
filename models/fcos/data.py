@@ -20,7 +20,7 @@ def compute_centers_per_level(level, height, width):
     return xy
 
 
-def compute_level_target(boxes, class_ids, low, high, centers):
+def compute_level_target(boxes, class_ids, min_size, max_size, centers):
     centers = tf.cast(centers, tf.float32)
     boxes = tf.cast(boxes, tf.float32)
 
@@ -30,23 +30,24 @@ def compute_level_target(boxes, class_ids, low, high, centers):
     lt = tf.expand_dims(centers, axis=1) - xy_min
     rb = xy_max - tf.expand_dims(centers, axis=1)
     ltrb = tf.concat([lt, rb], axis=2)
-    
+
     max_ltrb = tf.reduce_max(ltrb, axis=2)
-    
-    center_valid_mask = tf.logical_and(tf.greater(max_ltrb, low), tf.less(max_ltrb, high))
-    
-    size_valid_mask = tf.cast(tf.greater(ltrb, 0), dtype=tf.float32)
-    size_valid_mask = tf.not_equal(tf.reduce_prod(size_valid_mask, axis=2), 0.)
-    valid_mask = tf.logical_and(size_valid_mask, center_valid_mask)
-    valid_mask = tf.cast(valid_mask, dtype=tf.float32)
-    
-    valid_centers = tf.not_equal(tf.reduce_sum(valid_mask, axis=1), 0)
+
+    valid_size = tf.logical_and(tf.greater(max_ltrb, min_size), tf.less(max_ltrb, max_size))
+
+    inside_box = tf.cast(tf.greater(ltrb, 0), dtype=tf.float32)
+    inside_box = tf.not_equal(tf.reduce_prod(inside_box, axis=2), 0.)
+
+    valid_boxes = tf.logical_and(inside_box, valid_size)
+    valid_boxes = tf.cast(valid_boxes, dtype=tf.float32)
+
+    valid_centers = tf.not_equal(tf.reduce_sum(valid_boxes, axis=1), 0)
     valid_centers = tf.cast(valid_centers, dtype=tf.float32)
-    
-    center_indices = tf.argmax(valid_mask, axis=1)
-    
-    matched_boxes = tf.gather(boxes, center_indices)
-    matched_class_ids = tf.reshape(tf.gather(class_ids, center_indices) + 1, (-1,))
+
+    box_indices = tf.argmax(valid_boxes, axis=1)
+
+    matched_boxes = tf.gather(boxes, box_indices)
+    matched_class_ids = tf.reshape(tf.gather(class_ids, box_indices) + 1, (-1,))
 
     x_min, y_min, x_max, y_max = tf.split(matched_boxes, num_or_size_splits=4, axis=1)
     l = tf.abs(centers[:, 0] - x_min[:, 0])
@@ -66,7 +67,7 @@ def compute_level_target(boxes, class_ids, low, high, centers):
     ctr_target = tf.reshape(ctr_target, shape=[-1, 1])
     reg_target = tf.stack([l, t, r, b], axis=1) * tf.expand_dims(valid_centers, axis=1)
 
-    return cls_target, ctr_target, reg_target, valid_centers, center_indices
+    return cls_target, ctr_target, reg_target, valid_centers, box_indices
 
 
 def compute_targets(class_ids, boxes, centers):
@@ -78,14 +79,14 @@ def compute_targets(class_ids, boxes, centers):
     soi = [0] + [2 ** i * 64 for i in range(6)] + [1e8]
     targets = []
     for i in range(5):
-        level_targets = compute_level_target(boxes, class_ids, soi[i], soi[i+1], centers[i])
+        level_targets = compute_level_target(boxes, class_ids, soi[i], soi[i + 1], centers[i])
         targets.append(level_targets)
-    
+
     cls_targets = tf.concat([target[0] for target in targets], axis=0)
     ctr_targets = tf.concat([target[1] for target in targets], axis=0)
     reg_targets = tf.concat([target[2] for target in targets], axis=0)
     valid_centers = tf.concat([target[3] for target in targets], axis=0)
-    center_indices = tf.concat([target[4] for target in targets], axis=0)
+    box_indices = tf.concat([target[4] for target in targets], axis=0)
     normalizer_value = tf.maximum(tf.reduce_sum(valid_centers, keepdims=True), 1.0)
 
-    return cls_targets, ctr_targets, reg_targets, valid_centers, normalizer_value, center_indices
+    return cls_targets, ctr_targets, reg_targets, valid_centers, normalizer_value, box_indices

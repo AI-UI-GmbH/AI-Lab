@@ -9,13 +9,17 @@ from dataset import Dataset
 
 
 class CocoDataset(Dataset):
-    def __init__(self, data_dir, annotation_dir, cfg):
+    def __init__(self, data_dir, annotation_dir, cfg, classes=None):
         self.coco = COCO(annotation_dir)
-        classes = ['BG'] + [cat['name'] for cat in list(self.coco.cats.values())]
+        if classes is None:
+            classes = ['BG'] + [cat['name'] for cat in list(self.coco.cats.values())]
         super().__init__(data_dir, annotation_dir, cfg, classes=classes)
 
         self.imgs = list(self.coco.imgs.values())
         for img in self.imgs: img['filename'] = img['file_name']
+
+    def load_dataset(self):
+        pass
 
     def load_mask(self, img_id):
         """Generate instance masks for an image.

@@ -1,6 +1,8 @@
 import tensorflow as tf
 import tensorflow.keras.layers as KL
 
+from models.resnet.model import resnet_graph
+
 
 def fpn_graph(input_tensor=None, 
               pyramid_size=256,
@@ -20,36 +22,7 @@ def fpn_graph(input_tensor=None,
         Output tensors of FPN
     """
 
-    layer_names = [
-        'conv2_block3_1_relu',
-        'conv3_block4_1_relu',
-        'conv4_block6_1_relu',
-        'conv5_block3_1_relu',
-    ]
-
-    if isinstance(backbone, str):
-        assert backbone in ['ResNet50V2', 'ResNet101V2', 'ResNet152V2']
-
-        if backbone == 'ResNet101V2':
-            layer_names[2] = 'conv4_block23_1_relu'
-        elif backbone == 'ResNet152V2':
-            layer_names[1] = 'conv3_block8_1_relu'
-            layer_names[2] = 'conv4_block26_1_relu'
-
-        backbone = getattr(tf.keras.applications, backbone)(
-            include_top=False,
-            input_tensor=input_tensor,
-            pooling=None,
-            weights=weights
-        )
-
-        C5 = backbone.get_layer(layer_names[3]).output
-        C4 = backbone.get_layer(layer_names[2]).output
-        C3 = backbone.get_layer(layer_names[1]).output
-        C2 = backbone.get_layer(layer_names[0]).output
-
-    else:
-        C2, C3, C4, C5 = backbone.outputs
+    C2, C3, C4, C5 = resnet_graph(input_tensor=input_tensor, name=backbone, weights=weights)
 
     P5 = KL.Conv2D(pyramid_size, 1, name='fpn_c5p5')(C5)
     P4 = KL.Add(name="fpn_p4add")([KL.UpSampling2D(size=(2, 2), name="fpn_p5upsampled")(P5),
@@ -71,8 +44,6 @@ def fpn_graph(input_tensor=None,
         outputs.append(P6)
     if extended_layer == 'P6P7':
         outputs.append(P7)
-    for o in outputs:
-        print(o.shape)
     return outputs
     
 
